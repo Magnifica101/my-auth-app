@@ -3,25 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My First Auth App</title>
+    <title>My Gym Log App</title>
+    <!-- Supabase JavaScript library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 2em; text-align: center; }
-        button { font-size: 1.2em; padding: 0.5em 1em; margin-top: 1em; cursor: pointer; }
-        #userInfo { margin-top: 1em; font-size: 1.5em; color: green; font-weight: bold; }
-        #status { font-style: italic; color: #555; }
+        /* Custom styles to complement Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
 </head>
-<body>
+<body class="bg-gray-50 text-gray-800">
 
-    <h1>Supabase Auth Test</h1>
-    <div id="status">Checking login status...</div>
-    <div id="userInfo"></div>
-    <button id="loginBtn">Log In with Facebook</button>
-    <button id="logoutBtn" style="display:none;">Log Out</button>
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+        <div class="max-w-md w-full bg-white p-8 rounded-xl shadow-md">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Gym Log App</h1>
+            <div id="status" class="text-gray-500 mb-4">Checking login status...</div>
+            <div id="userInfo" class="text-2xl font-bold text-green-600 mb-6"></div>
+
+            <!-- Branded Facebook Login Button -->
+            <button id="loginBtn" class="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors duration-300 ease-in-out">
+                <svg aria-hidden="true" class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.676 0H1.324C.593 0 0 .593 0 1.324v21.352C0 23.407.593 24 1.324 24h11.494v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116c.73 0 1.323-.593 1.323-1.324V1.324C24 .593 23.407 0 22.676 0Z" fill="white"></path></svg>
+                <span>Log In with Facebook</span>
+            </button>
+            
+            <!-- Logout Button -->
+            <button id="logoutBtn" class="w-full mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out" style="display:none;">Log Out</button>
+        </div>
+    </div>
 
     <script>
         // --- CONFIGURATION ---
+        // These are your actual Supabase credentials.
         const SUPABASE_URL = 'https://fvjkqfrsxraivxomdywc.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2amtxZnJzeHJhaXZ4b21keXdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNzg2MzMsImV4cCI6MjA2OTk1NDYzM30.QqimcxoaZ0WHT_jvAlGjyWZ6lVbJ9g9iOyyDrUh-r24';
 
@@ -29,44 +48,76 @@
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // --- DOM Element References ---
         const loginButton = document.getElementById('loginBtn');
         const logoutButton = document.getElementById('logoutBtn');
         const userInfoDiv = document.getElementById('userInfo');
         const statusDiv = document.getElementById('status');
 
+        /**
+         * Initiates the OAuth login process with Facebook.
+         * Supabase handles the redirect to Facebook and then back to the specified URL.
+         */
         const logInWithFacebook = async () => {
-            await _supabase.auth.signInWithOAuth({
-    provider: 'facebook',
-    options: {
-        redirectTo: 'https://magnifica101.github.io/my-auth-app/'
-    }
-});
+            statusDiv.innerText = 'Redirecting to Facebook...';
+            const { error } = await _supabase.auth.signInWithOAuth({
+                provider: 'facebook',
+                options: {
+                    // This MUST match the URL you configured in your Supabase dashboard and GitHub Pages.
+                    redirectTo: 'https://magnifica101.github.io/my-auth-app/'
+                }
+            });
+            if (error) {
+                statusDiv.innerText = `Error: ${error.message}`;
+                console.error('Error logging in:', error);
+            }
         };
 
+        /**
+         * Signs the user out of the application.
+         */
         const logout = async () => {
-            await _supabase.auth.signOut();
+            statusDiv.innerText = 'Logging out...';
+            const { error } = await _supabase.auth.signOut();
+            if (error) {
+                statusDiv.innerText = `Error: ${error.message}`;
+                console.error('Error logging out:', error);
+            } else {
+                // The onAuthStateChange listener will handle the UI update.
+                statusDiv.innerText = 'You have been logged out.';
+            }
         };
 
+        // --- Event Listeners ---
         loginButton.addEventListener('click', logInWithFacebook);
         logoutButton.addEventListener('click', logout);
 
+        /**
+         * This is the core listener that reacts to authentication state changes.
+         * It fires when the page loads and anytime a user logs in or out.
+         */
         _supabase.auth.onAuthStateChange((event, session) => {
+            console.log('Auth event:', event, session);
             if (session && session.user) {
-                // User is logged in
-                const userName = session.user.user_metadata.full_name || session.user.email;
+                // --- User is logged in ---
+                // Extract user's full name from metadata, fallback to email if not available.
+                const userName = session.user.user_metadata?.full_name || session.user.email;
                 userInfoDiv.innerText = `Hello, ${userName}`;
                 statusDiv.innerText = 'You are logged in.';
+                
+                // Update UI to show logout button and hide login button.
                 loginButton.style.display = 'none';
                 logoutButton.style.display = 'block';
             } else {
-                // User is logged out
+                // --- User is logged out or session is invalid ---
                 userInfoDiv.innerText = '';
                 statusDiv.innerText = 'You are not logged in.';
-                loginButton.style.display = 'block';
+
+                // Update UI to show login button and hide logout button.
+                loginButton.style.display = 'flex'; // Use flex to match its styled state
                 logoutButton.style.display = 'none';
             }
         });
     </script>
-
 </body>
 </html>
