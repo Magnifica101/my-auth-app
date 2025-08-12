@@ -251,18 +251,20 @@
         };
 
         const renderCurrentSession = () => {
+            const sessionListEl = document.getElementById('session-exercises-list');
+            if (!sessionListEl) return;
             if (currentSessionLogs.length === 0) {
-                sessionExercisesList.innerHTML = '<p class="text-gray-500">No exercises added yet.</p>';
+                sessionListEl.innerHTML = '<p class="text-gray-500">No exercises added yet.</p>';
                 return;
             }
-            sessionExercisesList.innerHTML = '';
+            sessionListEl.innerHTML = '';
             currentSessionLogs.forEach((log, index) => {
                 const exercise = masterExerciseList.find(ex => ex.id == log.exercise_id);
                 const logEl = document.createElement('div');
                 logEl.className = 'bg-gray-200 p-3 rounded-md';
                 logEl.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
-                        <p class="font-bold">${exercise.name}</p>
+                        <p class="font-bold">${exercise ? exercise.name : 'Unknown Exercise'}</p>
                         <button onclick="removeExerciseFromSession(${index})" class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">&times;</button>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
@@ -280,7 +282,7 @@
                         </div>
                     </div>
                 `;
-                sessionExercisesList.appendChild(logEl);
+                sessionListEl.appendChild(logEl);
             });
         };
 
@@ -401,10 +403,12 @@
 
             if (routineError) return console.error('Error saving routine:', routineError);
 
-            const itemsToInsert = currentSessionLogs.map(log => ({
+            const uniqueExerciseIds = [...new Set(currentSessionLogs.map(log => log.exercise_id))];
+            const itemsToInsert = uniqueExerciseIds.map(exId => ({
                 routine_id: newRoutine.id,
-                exercise_id: log.exercise_id
+                exercise_id: exId
             }));
+
             const { error: itemsError } = await _supabase.from('routine_items').insert(itemsToInsert);
             
             if (itemsError) console.error('Error saving routine items:', itemsError);
