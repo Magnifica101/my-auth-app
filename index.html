@@ -8,6 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,13 +17,6 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         .hidden { display: none; }
-        /* Styles for the modal */
-        #modal-backdrop {
-            transition: opacity 0.3s ease;
-        }
-        #modal-content {
-            transition: transform 0.3s ease;
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -45,21 +40,19 @@
                 <!-- Header -->
                 <div class="flex justify-between items-center mb-6">
                     <div id="userInfo" class="text-xl font-bold text-gray-800"></div>
-                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Log Out</button>
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Log Out</button>
                 </div>
 
                 <!-- Dashboard View -->
                 <div id="dashboard-view">
                     <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
                     <div class="space-y-4">
-                        <button id="startWorkoutBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                            Start New Blank Workout
-                        </button>
+                        <button id="startWorkoutBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg">Start New Blank Workout</button>
+                        <button id="showHistoryBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg">View Workout History</button>
+                        <button id="showProgressBtn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg">View Progress</button>
                         <div id="routines-section">
                              <h3 class="text-xl font-bold mt-6 mb-2">My Routines</h3>
-                             <div id="routines-list" class="space-y-2">
-                                 <p>Loading routines...</p>
-                             </div>
+                             <div id="routines-list" class="space-y-2"><p>Loading routines...</p></div>
                         </div>
                     </div>
                 </div>
@@ -95,12 +88,36 @@
                         <button id="cancelWorkoutBtn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel Workout</button>
                     </div>
                 </div>
+                
+                <!-- Workout History View -->
+                <div id="history-view" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Workout History</h2>
+                        <button class="back-to-dash-btn bg-gray-200 py-2 px-4 rounded-lg">Back</button>
+                    </div>
+                    <div id="history-list" class="space-y-4"></div>
+                </div>
+
+                <!-- Progress View -->
+                <div id="progress-view" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Progress</h2>
+                        <button class="back-to-dash-btn bg-gray-200 py-2 px-4 rounded-lg">Back</button>
+                    </div>
+                    <div>
+                        <label for="progress-exercise-select" class="block text-sm font-medium text-gray-700">Select Exercise to View Progress</label>
+                        <select id="progress-exercise-select" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div class="mt-4" style="height: 300px;">
+                        <canvas id="progress-chart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
         
         <!-- Save Routine Modal -->
-        <div id="save-routine-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" id="modal-backdrop">
-            <div id="modal-content" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm transform scale-95">
+        <div id="save-routine-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+             <div id="modal-content" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm transform scale-95">
                 <h2 class="text-xl font-bold mb-4">Save Workout as Routine</h2>
                 <p class="mb-4 text-sm text-gray-600">Save the exercises from this session as a new reusable template.</p>
                 <form id="save-routine-form">
@@ -118,11 +135,9 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- CONFIGURATION & CLIENT ---
         const SUPABASE_URL = 'https://fvjkqfrsxraivxomdywc.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2amtxZnJzeHJhaXZ4b21keXdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNzg2MzMsImV4cCI6MjA2OTk1NDYzM30.QqimcxoaZ0WHT_jvAlGjyWZ6lVbJ9g9iOyyDrUh-r24';
-
-        // --- SUPABASE CLIENT ---
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -131,13 +146,22 @@
         const loginBtn = document.getElementById('loginBtn'), logoutBtn = document.getElementById('logoutBtn');
         const statusDiv = document.getElementById('status'), userInfoDiv = document.getElementById('userInfo');
         const dashboardView = document.getElementById('dashboard-view'), liveSessionView = document.getElementById('live-session-view');
-        const startWorkoutBtn = document.getElementById('startWorkoutBtn'), finishWorkoutBtn = document.getElementById('finishWorkoutBtn');
-        const cancelWorkoutBtn = document.getElementById('cancelWorkoutBtn');
-        const addExerciseForm = document.getElementById('add-exercise-form'), exerciseSelect = document.getElementById('exercise-select');
-        const sessionExercisesList = document.getElementById('session-exercises-list');
+        const historyView = document.getElementById('history-view'), progressView = document.getElementById('progress-view');
+        const startWorkoutBtn = document.getElementById('startWorkoutBtn');
+        const showHistoryBtn = document.getElementById('showHistoryBtn'), showProgressBtn = document.getElementById('showProgressBtn');
+        const backToDashBtns = document.querySelectorAll('.back-to-dash-btn');
         const routinesList = document.getElementById('routines-list');
-        const saveRoutineModal = document.getElementById('save-routine-modal'), saveRoutineForm = document.getElementById('save-routine-form');
+        const historyList = document.getElementById('history-list');
+        const progressExerciseSelect = document.getElementById('progress-exercise-select');
+        const progressChartCanvas = document.getElementById('progress-chart');
+        const finishWorkoutBtn = document.getElementById('finishWorkoutBtn');
+        const cancelWorkoutBtn = document.getElementById('cancelWorkoutBtn');
+        const addExerciseForm = document.getElementById('add-exercise-form');
+        const exerciseSelect = document.getElementById('exercise-select');
+        const saveRoutineModal = document.getElementById('save-routine-modal');
+        const saveRoutineForm = document.getElementById('save-routine-form');
         const skipSaveBtn = document.getElementById('skip-save-btn');
+        let progressChart = null;
 
         // --- APP STATE ---
         let masterExerciseList = [], userRoutines = [], currentSessionLogs = [];
@@ -148,14 +172,14 @@
 
         // --- UI VIEW MANAGEMENT ---
         const showView = (view) => {
-            [authView, appView, dashboardView, liveSessionView, saveRoutineModal].forEach(el => el.classList.add('hidden'));
+            [authView, appView, dashboardView, liveSessionView, historyView, progressView, saveRoutineModal].forEach(el => el.classList.add('hidden'));
             if (view === 'login') authView.classList.remove('hidden');
-            else if (view === 'dashboard') {
+            else {
                 appView.classList.remove('hidden');
-                dashboardView.classList.remove('hidden');
-            } else if (view === 'live-session') {
-                appView.classList.remove('hidden');
-                liveSessionView.classList.remove('hidden');
+                if (view === 'dashboard') dashboardView.classList.remove('hidden');
+                if (view === 'live-session') liveSessionView.classList.remove('hidden');
+                if (view === 'history') historyView.classList.remove('hidden');
+                if (view === 'progress') progressView.classList.remove('hidden');
             }
         };
 
@@ -163,7 +187,7 @@
         const fetchInitialData = async () => {
             await Promise.all([fetchMasterExerciseList(), fetchUserRoutines()]);
         };
-
+        
         const fetchMasterExerciseList = async () => {
             const { data, error } = await _supabase.from('exercises').select('id, name').order('name');
             if (error) console.error('Error fetching exercises:', error);
@@ -182,6 +206,26 @@
             }
         };
 
+        const fetchWorkoutHistory = async () => {
+            historyList.innerHTML = '<p>Loading history...</p>';
+            const { data, error } = await _supabase
+                .from('exercise_logs')
+                .select(`*, exercises (name)`)
+                .order('log_date', { ascending: false });
+
+            if (error) return console.error("Error fetching history:", error);
+            
+            const workoutsByDate = data.reduce((acc, log) => {
+                const date = log.log_date;
+                if (!acc[date]) acc[date] = [];
+                acc[date].push(log);
+                return acc;
+            }, {});
+
+            renderWorkoutHistory(workoutsByDate);
+            showView('history');
+        };
+
         // --- RENDERING LOGIC ---
         const populateExerciseDropdown = () => {
             exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
@@ -195,10 +239,13 @@
             }
             routinesList.innerHTML = '';
             userRoutines.forEach(routine => {
-                const routineEl = document.createElement('button');
-                routineEl.className = 'w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-left';
-                routineEl.textContent = routine.name;
-                routineEl.onclick = () => loadRoutine(routine.id);
+                const routineEl = document.createElement('div');
+                routineEl.className = 'flex items-center gap-2';
+                routineEl.innerHTML = `
+                    <button class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg text-left">${routine.name}</button>
+                    <button onclick="handleDeleteRoutine(${routine.id}, '${routine.name}')" class="bg-red-500 hover:bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 text-lg font-bold">&times;</button>
+                `;
+                routineEl.querySelector('button').onclick = () => loadRoutine(routine.id);
                 routinesList.appendChild(routineEl);
             });
         };
@@ -235,6 +282,29 @@
                 `;
                 sessionExercisesList.appendChild(logEl);
             });
+        };
+
+        const renderWorkoutHistory = (workoutsByDate) => {
+            historyList.innerHTML = '';
+            if (Object.keys(workoutsByDate).length === 0) {
+                historyList.innerHTML = '<p>No workouts found in your history.</p>';
+                return;
+            }
+
+            for (const date in workoutsByDate) {
+                const dateEl = document.createElement('div');
+                dateEl.className = 'bg-white p-4 rounded-lg shadow';
+                const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                let exercisesHTML = workoutsByDate[date].map(log => `
+                    <div class="flex justify-between border-t pt-2 mt-2">
+                        <p class="font-semibold">${log.exercises.name}</p>
+                        <p>${log.sets}x${log.reps} @ ${log.weight}kg</p>
+                    </div>
+                `).join('');
+
+                dateEl.innerHTML = `<h3 class="font-bold text-lg mb-2">${formattedDate}</h3> ${exercisesHTML}`;
+                historyList.appendChild(dateEl);
+            }
         };
 
         // --- SESSION & ROUTINE LOGIC ---
@@ -292,7 +362,7 @@
                 alert('No exercises logged.');
                 return showView('dashboard');
             }
-            updateSessionLogsFromUI(); // Read data from inputs before showing modal
+            updateSessionLogsFromUI();
             saveRoutineModal.classList.remove('hidden');
         };
         
@@ -343,10 +413,71 @@
             await saveLogsAndExit();
         };
 
+        const handleDeleteRoutine = async (routineId, routineName) => {
+            if (!confirm(`Are you sure you want to delete the routine "${routineName}"?`)) return;
+
+            const { error } = await _supabase.from('routines').delete().match({ id: routineId });
+            if (error) {
+                alert('Error deleting routine.');
+                console.error(error);
+            } else {
+                alert('Routine deleted.');
+                fetchUserRoutines(); // Refresh the list
+            }
+        };
+
+        // --- PROGRESS CHART LOGIC ---
+        const showProgress = () => {
+            progressExerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
+            masterExerciseList.forEach(ex => {
+                progressExerciseSelect.innerHTML += `<option value="${ex.id}">${ex.name}</option>`;
+            });
+            if (progressChart) progressChart.destroy();
+            showView('progress');
+        };
+
+        const fetchAndDrawProgressChart = async (exerciseId) => {
+            if (!exerciseId) {
+                if(progressChart) progressChart.destroy();
+                return;
+            }
+
+            const { data, error } = await _supabase
+                .from('exercise_logs')
+                .select('log_date, weight')
+                .eq('exercise_id', exerciseId)
+                .order('log_date', { ascending: true });
+            
+            if (error) return console.error('Error fetching progress data:', error);
+
+            const labels = data.map(log => new Date(log.log_date + 'T00:00:00').toLocaleDateString('en-NZ'));
+            const weights = data.map(log => log.weight);
+
+            if (progressChart) progressChart.destroy();
+            progressChart = new Chart(progressChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Weight Lifted (kg)',
+                        data: weights,
+                        borderColor: 'rgb(13, 148, 136)',
+                        backgroundColor: 'rgba(13, 148, 136, 0.5)',
+                        tension: 0.1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        };
+
         // --- EVENT LISTENERS ---
         loginBtn.addEventListener('click', logInWithFacebook);
         logoutBtn.addEventListener('click', logout);
         startWorkoutBtn.addEventListener('click', startNewWorkout);
+        showHistoryBtn.addEventListener('click', fetchWorkoutHistory);
+        showProgressBtn.addEventListener('click', showProgress);
+        backToDashBtns.forEach(btn => btn.addEventListener('click', () => showView('dashboard')));
+        progressExerciseSelect.addEventListener('change', (e) => fetchAndDrawProgressChart(e.target.value));
         finishWorkoutBtn.addEventListener('click', finishWorkout);
         cancelWorkoutBtn.addEventListener('click', () => showView('dashboard'));
         addExerciseForm.addEventListener('submit', handleAddExercise);
@@ -356,8 +487,7 @@
         // --- MAIN AUTH STATE LISTENER ---
         _supabase.auth.onAuthStateChange((event, session) => {
             if (session && session.user) {
-                const userName = session.user.user_metadata?.full_name || session.user.email;
-                userInfoDiv.innerText = `Hello, ${userName}`;
+                userInfoDiv.textContent = `Hello, ${session.user.user_metadata?.full_name || session.user.email}`;
                 fetchInitialData();
                 showView('dashboard');
             } else {
