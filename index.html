@@ -13,84 +13,80 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles to complement Tailwind */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Simple transition for showing/hiding elements */
-        .hidden {
-            display: none;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .hidden { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <div class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div id="auth-container" class="max-w-md w-full">
-            <!-- This container holds the login/logout UI -->
+        <!-- Auth View -->
+        <div id="auth-view" class="max-w-md w-full">
             <div class="bg-white p-8 rounded-xl shadow-md text-center">
                 <h1 class="text-3xl font-bold text-gray-900 mb-2">Gym Log App</h1>
                 <div id="status" class="text-gray-500 mb-4">Checking login status...</div>
-
-                <!-- Login Button -->
-                <button id="loginBtn" class="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors duration-300 ease-in-out">
+                <button id="loginBtn" class="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors">
                     <svg aria-hidden="true" class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.676 0H1.324C.593 0 0 .593 0 1.324v21.352C0 23.407.593 24 1.324 24h11.494v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116c.73 0 1.323-.593 1.323-1.324V1.324C24 .593 23.407 0 22.676 0Z" fill="white"></path></svg>
                     <span>Log In with Facebook</span>
                 </button>
             </div>
         </div>
 
-        <!-- Main App Content (shown after login) -->
-        <div id="app-container" class="max-w-xl w-full hidden">
+        <!-- App View (Dashboard & Live Session) -->
+        <div id="app-view" class="max-w-xl w-full hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
+                <!-- Header -->
                 <div class="flex justify-between items-center mb-6">
                     <div id="userInfo" class="text-xl font-bold text-gray-800"></div>
                     <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Log Out</button>
                 </div>
 
-                <!-- This is the main dashboard view -->
+                <!-- Dashboard View -->
                 <div id="dashboard-view">
-                     <button id="showWorkoutFormBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                        Log a New Workout
+                    <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
+                    <button id="startWorkoutBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                        Start New Workout
                     </button>
+                    <!-- Routine management will go here in Phase 3 -->
                 </div>
 
-                <!-- This is the workout logger form, initially hidden -->
-                <div id="workout-form-view" class="hidden mt-6">
-                    <h2 class="text-2xl font-bold mb-4 text-center">New Workout</h2>
-                    <form id="workout-form" class="space-y-4">
+                <!-- Live Workout Session View -->
+                <div id="live-session-view" class="hidden">
+                    <h2 class="text-2xl font-bold mb-4">Live Workout</h2>
+                    <div id="session-exercises-list" class="space-y-4 mb-6">
+                        <!-- Logged exercises for this session will appear here -->
+                        <p class="text-gray-500">No exercises added yet.</p>
+                    </div>
+
+                    <!-- Add Exercise Form -->
+                    <form id="add-exercise-form" class="space-y-4 bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-bold text-lg">Add Exercise</h3>
                         <div>
-                            <label for="exercise-name" class="block text-sm font-medium text-gray-700">Exercise Name</label>
-                            <input type="text" id="exercise-name" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="exercise-select" class="block text-sm font-medium text-gray-700">Exercise</label>
+                            <select id="exercise-select" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Loading exercises...</option>
+                            </select>
                         </div>
                         <div class="grid grid-cols-3 gap-4">
                             <div>
                                 <label for="weight" class="block text-sm font-medium text-gray-700">Weight (kg)</label>
-                                <input type="number" id="weight" step="0.5" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="weight" step="0.5" required class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
                             </div>
                             <div>
                                 <label for="reps" class="block text-sm font-medium text-gray-700">Reps</label>
-                                <input type="number" id="reps" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="reps" required class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
                             </div>
                             <div>
                                 <label for="sets" class="block text-sm font-medium text-gray-700">Sets</label>
-                                <input type="number" id="sets" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="sets" required class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
                             </div>
                         </div>
-                        <div class="flex gap-4 pt-2">
-                             <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save Workout</button>
-                             <button type="button" id="cancelWorkoutBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
-                        </div>
+                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Add to Workout</button>
                     </form>
-                </div>
-            </div>
-
-            <!-- Workout History -->
-            <div class="mt-8">
-                <h2 class="text-2xl font-bold mb-4">Workout History</h2>
-                <div id="workout-history" class="space-y-4">
-                    <!-- Workout entries will be dynamically inserted here -->
-                    <p id="history-status">No workouts logged yet.</p>
+                    
+                    <div class="mt-6 flex gap-4">
+                        <button id="finishWorkoutBtn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-lg transition-colors">Finish Workout</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -106,159 +102,169 @@
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // --- DOM Element References ---
+        const authView = document.getElementById('auth-view');
+        const appView = document.getElementById('app-view');
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const statusDiv = document.getElementById('status');
         const userInfoDiv = document.getElementById('userInfo');
-        const authContainer = document.getElementById('auth-container');
-        const appContainer = document.getElementById('app-container');
-        
-        // New elements for Step 2
-        const showWorkoutFormBtn = document.getElementById('showWorkoutFormBtn');
-        const cancelWorkoutBtn = document.getElementById('cancelWorkoutBtn');
         const dashboardView = document.getElementById('dashboard-view');
-        const workoutFormView = document.getElementById('workout-form-view');
-        const workoutForm = document.getElementById('workout-form');
-        const workoutHistoryDiv = document.getElementById('workout-history');
-        const historyStatus = document.getElementById('history-status');
+        const liveSessionView = document.getElementById('live-session-view');
+        const startWorkoutBtn = document.getElementById('startWorkoutBtn');
+        const finishWorkoutBtn = document.getElementById('finishWorkoutBtn');
+        const addExerciseForm = document.getElementById('add-exercise-form');
+        const exerciseSelect = document.getElementById('exercise-select');
+        const sessionExercisesList = document.getElementById('session-exercises-list');
+
+        // --- APP STATE ---
+        let masterExerciseList = [];
+        let currentSessionLogs = [];
 
         // --- AUTHENTICATION LOGIC ---
         const logInWithFacebook = async () => {
-            statusDiv.innerText = 'Redirecting to Facebook...';
-            await _supabase.auth.signInWithOAuth({
-                provider: 'facebook',
-                options: { redirectTo: 'https://magnifica101.github.io/my-auth-app/' }
+            await _supabase.auth.signInWithOAuth({ provider: 'facebook', options: { redirectTo: window.location.href } });
+        };
+        const logout = () => _supabase.auth.signOut();
+
+        // --- UI VIEW MANAGEMENT ---
+        const showView = (view) => {
+            ['auth-view', 'app-view', 'dashboard-view', 'live-session-view'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
             });
-        };
 
-        const logout = async () => {
-            await _supabase.auth.signOut();
-        };
-
-        // --- UI TOGGLING LOGIC ---
-        const showDashboard = () => {
-            dashboardView.classList.remove('hidden');
-            workoutFormView.classList.add('hidden');
-        };
-
-        const showWorkoutForm = () => {
-            dashboardView.classList.add('hidden');
-            workoutFormView.classList.remove('hidden');
-            workoutForm.reset(); // Clear form fields
-        };
-
-        // --- WORKOUT DATA LOGIC (NEW FOR STEP 2) ---
-
-        /**
-         * Fetches all workout records for the current user from the database.
-         */
-        const fetchWorkouts = async () => {
-            historyStatus.textContent = 'Loading history...';
-            const { data: workouts, error } = await _supabase
-                .from('workouts')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching workouts:', error);
-                historyStatus.textContent = 'Error loading history.';
-            } else {
-                displayWorkouts(workouts);
+            if (view === 'login') {
+                authView.classList.remove('hidden');
+            } else if (view === 'dashboard') {
+                appView.classList.remove('hidden');
+                dashboardView.classList.remove('hidden');
+            } else if (view === 'live-session') {
+                appView.classList.remove('hidden');
+                liveSessionView.classList.remove('hidden');
             }
         };
 
+        // --- CORE APP LOGIC ---
+
         /**
-         * Renders the list of workouts to the page.
-         * @param {Array} workouts - An array of workout objects from Supabase.
+         * Fetches the master list of exercises from the database.
          */
-        const displayWorkouts = (workouts) => {
-            workoutHistoryDiv.innerHTML = ''; // Clear previous entries
-            if (workouts.length === 0) {
-                workoutHistoryDiv.innerHTML = '<p id="history-status">No workouts logged yet.</p>';
+        const fetchMasterExerciseList = async () => {
+            const { data, error } = await _supabase.from('exercises').select('id, name').order('name');
+            if (error) {
+                console.error('Error fetching exercises:', error);
+                return;
+            }
+            masterExerciseList = data;
+            populateExerciseDropdown();
+        };
+
+        /**
+         * Populates the dropdown select menu with exercises.
+         */
+        const populateExerciseDropdown = () => {
+            exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
+            masterExerciseList.forEach(ex => {
+                const option = document.createElement('option');
+                option.value = ex.id;
+                option.textContent = ex.name;
+                exerciseSelect.appendChild(option);
+            });
+        };
+
+        /**
+         * Starts a new workout session.
+         */
+        const startNewWorkout = () => {
+            currentSessionLogs = []; // Clear logs from any previous session
+            renderCurrentSession();
+            showView('live-session');
+        };
+
+        /**
+         * Renders the exercises logged in the current session.
+         */
+        const renderCurrentSession = () => {
+            if (currentSessionLogs.length === 0) {
+                sessionExercisesList.innerHTML = '<p class="text-gray-500">No exercises added yet.</p>';
+                return;
+            }
+            
+            sessionExercisesList.innerHTML = '';
+            currentSessionLogs.forEach(log => {
+                const exercise = masterExerciseList.find(ex => ex.id == log.exercise_id);
+                const logEl = document.createElement('div');
+                logEl.className = 'bg-gray-200 p-3 rounded-md';
+                logEl.innerHTML = `
+                    <p class="font-bold">${exercise.name}</p>
+                    <p>${log.sets} sets x ${log.reps} reps @ ${log.weight} kg</p>
+                `;
+                sessionExercisesList.appendChild(logEl);
+            });
+        };
+
+        /**
+         * Handles the submission of the 'add exercise' form.
+         */
+        const handleAddExercise = (event) => {
+            event.preventDefault();
+            const newLog = {
+                exercise_id: document.getElementById('exercise-select').value,
+                weight: document.getElementById('weight').value,
+                reps: document.getElementById('reps').value,
+                sets: document.getElementById('sets').value,
+            };
+            currentSessionLogs.push(newLog);
+            renderCurrentSession();
+            addExerciseForm.reset();
+        };
+
+        /**
+         * Finishes the workout and saves all logged exercises to the database.
+         */
+        const finishWorkout = async () => {
+            if (currentSessionLogs.length === 0) {
+                alert('No exercises logged. Add some exercises before finishing.');
                 return;
             }
 
-            workouts.forEach(workout => {
-                const workoutEl = document.createElement('div');
-                workoutEl.className = 'bg-white p-4 rounded-lg shadow';
-                const date = new Date(workout.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
-                
-                workoutEl.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-bold text-lg text-gray-800">${workout.exercise_name}</p>
-                            <p class="text-sm text-gray-500">${date}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-semibold text-gray-700">${workout.weight} kg</p>
-                            <p class="text-sm text-gray-600">${workout.sets} sets x ${workout.reps} reps</p>
-                        </div>
-                    </div>
-                `;
-                workoutHistoryDiv.appendChild(workoutEl);
-            });
-        };
-
-        /**
-         * Saves a new workout entry to the database.
-         */
-        const saveWorkout = async (event) => {
-            event.preventDefault(); // Prevent form from reloading the page
-            
             const user = (await _supabase.auth.getUser()).data.user;
             if (!user) {
-                alert('You must be logged in to save a workout.');
+                alert('Error: User not found.');
                 return;
             }
 
-            const exerciseName = document.getElementById('exercise-name').value;
-            const weight = document.getElementById('weight').value;
-            const reps = document.getElementById('reps').value;
-            const sets = document.getElementById('sets').value;
+            // Add user_id to each log before inserting
+            const logsToInsert = currentSessionLogs.map(log => ({ ...log, user_id: user.id }));
 
-            const { error } = await _supabase.from('workouts').insert({
-                user_id: user.id, // This is crucial for RLS
-                exercise_name: exerciseName,
-                weight: weight,
-                reps: reps,
-                sets: sets
-            });
+            const { error } = await _supabase.from('exercise_logs').insert(logsToInsert);
 
             if (error) {
                 console.error('Error saving workout:', error);
                 alert('Failed to save workout. See console for details.');
             } else {
-                showDashboard(); // Go back to the dashboard
-                fetchWorkouts(); // Refresh the history list
+                alert('Workout saved successfully!');
+                showView('dashboard');
             }
         };
-
 
         // --- EVENT LISTENERS ---
         loginBtn.addEventListener('click', logInWithFacebook);
         logoutBtn.addEventListener('click', logout);
-        showWorkoutFormBtn.addEventListener('click', showWorkoutForm);
-        cancelWorkoutBtn.addEventListener('click', showDashboard);
-        workoutForm.addEventListener('submit', saveWorkout);
+        startWorkoutBtn.addEventListener('click', startNewWorkout);
+        finishWorkoutBtn.addEventListener('click', finishWorkout);
+        addExerciseForm.addEventListener('submit', handleAddExercise);
 
         // --- MAIN AUTH STATE LISTENER ---
         _supabase.auth.onAuthStateChange((event, session) => {
             if (session && session.user) {
-                // --- User is logged in ---
-                authContainer.classList.add('hidden');
-                appContainer.classList.remove('hidden');
-
+                // User is logged in
                 const userName = session.user.user_metadata?.full_name || session.user.email;
                 userInfoDiv.innerText = `Hello, ${userName}`;
-                
-                showDashboard(); // Start at the dashboard
-                fetchWorkouts(); // Fetch user's data on login
-
+                fetchMasterExerciseList();
+                showView('dashboard');
             } else {
-                // --- User is logged out ---
-                authContainer.classList.remove('hidden');
-                appContainer.classList.add('hidden');
-                statusDiv.innerText = 'You are not logged in.';
+                // User is logged out
+                showView('login');
             }
         });
     </script>
