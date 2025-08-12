@@ -15,6 +15,13 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         .hidden { display: none; }
+        /* Styles for the modal */
+        #modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        #modal-content {
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -32,7 +39,7 @@
             </div>
         </div>
 
-        <!-- App View (Dashboard & Live Session) -->
+        <!-- App View -->
         <div id="app-view" class="max-w-xl w-full hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                 <!-- Header -->
@@ -44,28 +51,28 @@
                 <!-- Dashboard View -->
                 <div id="dashboard-view">
                     <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
-                    <button id="startWorkoutBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                        Start New Workout
-                    </button>
-                    <!-- Routine management will go here in Phase 3 -->
+                    <div class="space-y-4">
+                        <button id="startWorkoutBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                            Start New Blank Workout
+                        </button>
+                        <div id="routines-section">
+                             <h3 class="text-xl font-bold mt-6 mb-2">My Routines</h3>
+                             <div id="routines-list" class="space-y-2">
+                                 <p>Loading routines...</p>
+                             </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Live Workout Session View -->
                 <div id="live-session-view" class="hidden">
                     <h2 class="text-2xl font-bold mb-4">Live Workout</h2>
-                    <div id="session-exercises-list" class="space-y-4 mb-6">
-                        <!-- Logged exercises for this session will appear here -->
-                        <p class="text-gray-500">No exercises added yet.</p>
-                    </div>
-
-                    <!-- Add Exercise Form -->
+                    <div id="session-exercises-list" class="space-y-4 mb-6"></div>
                     <form id="add-exercise-form" class="space-y-4 bg-gray-50 p-4 rounded-lg">
                         <h3 class="font-bold text-lg">Add Exercise</h3>
                         <div>
                             <label for="exercise-select" class="block text-sm font-medium text-gray-700">Exercise</label>
-                            <select id="exercise-select" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">Loading exercises...</option>
-                            </select>
+                            <select id="exercise-select" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
                         </div>
                         <div class="grid grid-cols-3 gap-4">
                             <div>
@@ -83,11 +90,29 @@
                         </div>
                         <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Add to Workout</button>
                     </form>
-                    
                     <div class="mt-6 flex gap-4">
-                        <button id="finishWorkoutBtn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-lg transition-colors">Finish Workout</button>
+                        <button id="finishWorkoutBtn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-lg transition-colors">Finish & Save Workout</button>
+                        <button id="cancelWorkoutBtn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel Workout</button>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Save Routine Modal -->
+        <div id="save-routine-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" id="modal-backdrop">
+            <div id="modal-content" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm transform scale-95">
+                <h2 class="text-xl font-bold mb-4">Save Workout as Routine</h2>
+                <p class="mb-4 text-sm text-gray-600">Save the exercises from this session as a new reusable template.</p>
+                <form id="save-routine-form">
+                    <div>
+                        <label for="routine-name" class="block text-sm font-medium text-gray-700">Routine Name</label>
+                        <input type="text" id="routine-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div class="mt-6 flex justify-end gap-4">
+                        <button type="button" id="skip-save-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Don't Save Template</button>
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Save Routine</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -102,39 +127,30 @@
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // --- DOM Element References ---
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
-        const loginBtn = document.getElementById('loginBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const statusDiv = document.getElementById('status');
-        const userInfoDiv = document.getElementById('userInfo');
-        const dashboardView = document.getElementById('dashboard-view');
-        const liveSessionView = document.getElementById('live-session-view');
-        const startWorkoutBtn = document.getElementById('startWorkoutBtn');
-        const finishWorkoutBtn = document.getElementById('finishWorkoutBtn');
-        const addExerciseForm = document.getElementById('add-exercise-form');
-        const exerciseSelect = document.getElementById('exercise-select');
+        const authView = document.getElementById('auth-view'), appView = document.getElementById('app-view');
+        const loginBtn = document.getElementById('loginBtn'), logoutBtn = document.getElementById('logoutBtn');
+        const statusDiv = document.getElementById('status'), userInfoDiv = document.getElementById('userInfo');
+        const dashboardView = document.getElementById('dashboard-view'), liveSessionView = document.getElementById('live-session-view');
+        const startWorkoutBtn = document.getElementById('startWorkoutBtn'), finishWorkoutBtn = document.getElementById('finishWorkoutBtn');
+        const cancelWorkoutBtn = document.getElementById('cancelWorkoutBtn');
+        const addExerciseForm = document.getElementById('add-exercise-form'), exerciseSelect = document.getElementById('exercise-select');
         const sessionExercisesList = document.getElementById('session-exercises-list');
+        const routinesList = document.getElementById('routines-list');
+        const saveRoutineModal = document.getElementById('save-routine-modal'), saveRoutineForm = document.getElementById('save-routine-form');
+        const skipSaveBtn = document.getElementById('skip-save-btn');
 
         // --- APP STATE ---
-        let masterExerciseList = [];
-        let currentSessionLogs = [];
+        let masterExerciseList = [], userRoutines = [], currentSessionLogs = [];
 
-        // --- AUTHENTICATION LOGIC ---
-        const logInWithFacebook = async () => {
-            await _supabase.auth.signInWithOAuth({ provider: 'facebook', options: { redirectTo: window.location.href } });
-        };
+        // --- AUTH LOGIC ---
+        const logInWithFacebook = () => _supabase.auth.signInWithOAuth({ provider: 'facebook', options: { redirectTo: window.location.href } });
         const logout = () => _supabase.auth.signOut();
 
         // --- UI VIEW MANAGEMENT ---
         const showView = (view) => {
-            ['auth-view', 'app-view', 'dashboard-view', 'live-session-view'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-
-            if (view === 'login') {
-                authView.classList.remove('hidden');
-            } else if (view === 'dashboard') {
+            [authView, appView, dashboardView, liveSessionView, saveRoutineModal].forEach(el => el.classList.add('hidden'));
+            if (view === 'login') authView.classList.remove('hidden');
+            else if (view === 'dashboard') {
                 appView.classList.remove('hidden');
                 dashboardView.classList.remove('hidden');
             } else if (view === 'live-session') {
@@ -143,108 +159,169 @@
             }
         };
 
-        // --- CORE APP LOGIC ---
-
-        /**
-         * Fetches the master list of exercises from the database.
-         */
-        const fetchMasterExerciseList = async () => {
-            const { data, error } = await _supabase.from('exercises').select('id, name').order('name');
-            if (error) {
-                console.error('Error fetching exercises:', error);
-                return;
-            }
-            masterExerciseList = data;
-            populateExerciseDropdown();
+        // --- DATA FETCHING ---
+        const fetchInitialData = async () => {
+            await Promise.all([fetchMasterExerciseList(), fetchUserRoutines()]);
         };
 
-        /**
-         * Populates the dropdown select menu with exercises.
-         */
+        const fetchMasterExerciseList = async () => {
+            const { data, error } = await _supabase.from('exercises').select('id, name').order('name');
+            if (error) console.error('Error fetching exercises:', error);
+            else {
+                masterExerciseList = data;
+                populateExerciseDropdown();
+            }
+        };
+
+        const fetchUserRoutines = async () => {
+            const { data, error } = await _supabase.from('routines').select(`id, name, routine_items ( exercise_id )`);
+            if (error) console.error('Error fetching routines:', error);
+            else {
+                userRoutines = data;
+                renderRoutines();
+            }
+        };
+
+        // --- RENDERING LOGIC ---
         const populateExerciseDropdown = () => {
             exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
-            masterExerciseList.forEach(ex => {
-                const option = document.createElement('option');
-                option.value = ex.id;
-                option.textContent = ex.name;
-                exerciseSelect.appendChild(option);
+            masterExerciseList.forEach(ex => exerciseSelect.innerHTML += `<option value="${ex.id}">${ex.name}</option>`);
+        };
+
+        const renderRoutines = () => {
+            if (userRoutines.length === 0) {
+                routinesList.innerHTML = '<p class="text-gray-500">No routines saved yet.</p>';
+                return;
+            }
+            routinesList.innerHTML = '';
+            userRoutines.forEach(routine => {
+                const routineEl = document.createElement('button');
+                routineEl.className = 'w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-left';
+                routineEl.textContent = routine.name;
+                routineEl.onclick = () => loadRoutine(routine.id);
+                routinesList.appendChild(routineEl);
             });
         };
 
-        /**
-         * Starts a new workout session.
-         */
-        const startNewWorkout = () => {
-            currentSessionLogs = []; // Clear logs from any previous session
-            renderCurrentSession();
-            showView('live-session');
-        };
-
-        /**
-         * Renders the exercises logged in the current session.
-         */
         const renderCurrentSession = () => {
             if (currentSessionLogs.length === 0) {
                 sessionExercisesList.innerHTML = '<p class="text-gray-500">No exercises added yet.</p>';
                 return;
             }
-            
             sessionExercisesList.innerHTML = '';
-            currentSessionLogs.forEach(log => {
+            currentSessionLogs.forEach((log, index) => {
                 const exercise = masterExerciseList.find(ex => ex.id == log.exercise_id);
                 const logEl = document.createElement('div');
-                logEl.className = 'bg-gray-200 p-3 rounded-md';
+                logEl.className = 'bg-gray-200 p-3 rounded-md flex justify-between items-center';
                 logEl.innerHTML = `
-                    <p class="font-bold">${exercise.name}</p>
-                    <p>${log.sets} sets x ${log.reps} reps @ ${log.weight} kg</p>
+                    <div>
+                        <p class="font-bold">${exercise.name}</p>
+                        <p>${log.sets} sets x ${log.reps} reps @ ${log.weight} kg</p>
+                    </div>
+                    <button onclick="removeExerciseFromSession(${index})" class="bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center">&times;</button>
                 `;
                 sessionExercisesList.appendChild(logEl);
             });
         };
 
-        /**
-         * Handles the submission of the 'add exercise' form.
-         */
+        // --- SESSION & ROUTINE LOGIC ---
+        const startNewWorkout = () => {
+            currentSessionLogs = [];
+            renderCurrentSession();
+            showView('live-session');
+        };
+
+        const loadRoutine = async (routineId) => {
+            const routine = userRoutines.find(r => r.id === routineId);
+            if (!routine) return;
+
+            // Fetch the last logs for each exercise in the routine to pre-fill data
+            const exerciseIds = routine.routine_items.map(item => item.exercise_id);
+            const { data: lastLogs, error } = await _supabase
+                .from('exercise_logs')
+                .select('exercise_id, weight, reps, sets')
+                .in('exercise_id', exerciseIds)
+                .order('log_date', { ascending: false });
+
+            if (error) console.error('Error fetching last logs:', error);
+
+            currentSessionLogs = exerciseIds.map(exId => {
+                const lastLog = lastLogs?.find(log => log.exercise_id === exId);
+                return {
+                    exercise_id: exId,
+                    weight: lastLog?.weight || 0,
+                    reps: lastLog?.reps || 0,
+                    sets: lastLog?.sets || 0,
+                };
+            });
+            renderCurrentSession();
+            showView('live-session');
+        };
+        
+        const removeExerciseFromSession = (index) => {
+            currentSessionLogs.splice(index, 1);
+            renderCurrentSession();
+        };
+
         const handleAddExercise = (event) => {
             event.preventDefault();
-            const newLog = {
+            currentSessionLogs.push({
                 exercise_id: document.getElementById('exercise-select').value,
                 weight: document.getElementById('weight').value,
                 reps: document.getElementById('reps').value,
                 sets: document.getElementById('sets').value,
-            };
-            currentSessionLogs.push(newLog);
+            });
             renderCurrentSession();
             addExerciseForm.reset();
         };
 
-        /**
-         * Finishes the workout and saves all logged exercises to the database.
-         */
         const finishWorkout = async () => {
             if (currentSessionLogs.length === 0) {
-                alert('No exercises logged. Add some exercises before finishing.');
-                return;
+                alert('No exercises logged.');
+                return showView('dashboard');
             }
-
+            saveRoutineModal.classList.remove('hidden');
+        };
+        
+        const saveLogsAndExit = async () => {
             const user = (await _supabase.auth.getUser()).data.user;
-            if (!user) {
-                alert('Error: User not found.');
-                return;
-            }
-
-            // Add user_id to each log before inserting
             const logsToInsert = currentSessionLogs.map(log => ({ ...log, user_id: user.id }));
-
             const { error } = await _supabase.from('exercise_logs').insert(logsToInsert);
 
             if (error) {
                 console.error('Error saving workout:', error);
-                alert('Failed to save workout. See console for details.');
+                alert('Failed to save workout logs.');
             } else {
                 alert('Workout saved successfully!');
-                showView('dashboard');
             }
+            showView('dashboard');
+        };
+
+        const handleSaveRoutine = async (event) => {
+            event.preventDefault();
+            const routineName = document.getElementById('routine-name').value;
+            const user = (await _supabase.auth.getUser()).data.user;
+
+            // 1. Create the new routine
+            const { data: newRoutine, error: routineError } = await _supabase
+                .from('routines')
+                .insert({ name: routineName, user_id: user.id })
+                .select()
+                .single();
+
+            if (routineError) return console.error('Error saving routine:', routineError);
+
+            // 2. Create the routine items
+            const itemsToInsert = currentSessionLogs.map(log => ({
+                routine_id: newRoutine.id,
+                exercise_id: log.exercise_id
+            }));
+            const { error: itemsError } = await _supabase.from('routine_items').insert(itemsToInsert);
+            
+            if (itemsError) console.error('Error saving routine items:', itemsError);
+            
+            await fetchUserRoutines(); // Refresh the routine list
+            await saveLogsAndExit(); // Save the logs and go to dashboard
         };
 
         // --- EVENT LISTENERS ---
@@ -252,18 +329,19 @@
         logoutBtn.addEventListener('click', logout);
         startWorkoutBtn.addEventListener('click', startNewWorkout);
         finishWorkoutBtn.addEventListener('click', finishWorkout);
+        cancelWorkoutBtn.addEventListener('click', () => showView('dashboard'));
         addExerciseForm.addEventListener('submit', handleAddExercise);
+        saveRoutineForm.addEventListener('submit', handleSaveRoutine);
+        skipSaveBtn.addEventListener('click', saveLogsAndExit);
 
         // --- MAIN AUTH STATE LISTENER ---
         _supabase.auth.onAuthStateChange((event, session) => {
             if (session && session.user) {
-                // User is logged in
                 const userName = session.user.user_metadata?.full_name || session.user.email;
                 userInfoDiv.innerText = `Hello, ${userName}`;
-                fetchMasterExerciseList();
+                fetchInitialData();
                 showView('dashboard');
             } else {
-                // User is logged out
                 showView('login');
             }
         });
