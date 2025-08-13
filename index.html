@@ -95,7 +95,17 @@
                         <h2 class="text-2xl font-bold">Workout History</h2>
                         <button class="back-to-dash-btn bg-gray-200 py-2 px-4 rounded-lg">Back</button>
                     </div>
-                    <div id="history-list" class="space-y-4"></div>
+                    <div class="flex gap-4 mb-4">
+                        <div>
+                            <label for="history-year-select" class="block text-sm font-medium text-gray-700">Year</label>
+                            <select id="history-year-select" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
+                        </div>
+                        <div>
+                            <label for="history-month-select" class="block text-sm font-medium text-gray-700">Month</label>
+                            <select id="history-month-select" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
+                        </div>
+                    </div>
+                    <div id="history-list" class="space-y-2"></div>
                 </div>
 
                 <!-- Progress View -->
@@ -220,11 +230,17 @@
                 modal.classList.add('hidden');
             };
             
-            // Use { once: true } to automatically remove the event listener after it fires once.
             confirmBtn.addEventListener('click', confirmHandler, { once: true });
             cancelBtn.addEventListener('click', cancelHandler, { once: true });
 
             modal.classList.remove('hidden');
+        };
+
+        window.toggleWorkoutDetails = (headerElement) => {
+            const detailsDiv = headerElement.nextElementSibling;
+            const button = headerElement.querySelector('button');
+            const isHidden = detailsDiv.classList.toggle('hidden');
+            button.textContent = isHidden ? 'Expand' : 'Collapse';
         };
 
         // --- DATA FETCHING ---
@@ -250,14 +266,36 @@
             }
         };
 
-        const fetchWorkoutHistory = async () => {
+        const initializeHistoryView = async () => {
+            populateHistoryFilters();
+            const yearSelect = document.getElementById('history-year-select');
+            const monthSelect = document.getElementById('history-month-select');
+
+            yearSelect.addEventListener('change', () => fetchWorkoutHistory(yearSelect.value, monthSelect.value));
+            monthSelect.addEventListener('change', () => fetchWorkoutHistory(yearSelect.value, monthSelect.value));
+
+            await fetchWorkoutHistory(yearSelect.value, monthSelect.value);
+            showView('history');
+        };
+
+        const fetchWorkoutHistory = async (year, month) => {
             historyList.innerHTML = '<p>Loading history...</p>';
+
+            const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            const lastDay = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
             const { data, error } = await _supabase
                 .from('exercise_logs')
                 .select(`*, exercises (name)`)
+                .gte('log_date', firstDay)
+                .lte('log_date', lastDay)
                 .order('log_date', { ascending: false });
 
-            if (error) return console.error("Error fetching history:", error);
+            if (error) {
+                historyList.innerHTML = '<p class="text-red-500">Error fetching history.</p>';
+                return console.error("Error fetching history:", error);
+            }
             
             const workoutsByDate = data.reduce((acc, log) => {
                 const date = log.log_date;
@@ -267,13 +305,32 @@
             }, {});
 
             renderWorkoutHistory(workoutsByDate);
-            showView('history');
         };
 
         // --- RENDERING LOGIC ---
         const populateExerciseDropdown = () => {
             exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
             masterExerciseList.forEach(ex => exerciseSelect.innerHTML += `<option value="${ex.id}">${ex.name}</option>`);
+        };
+
+        const populateHistoryFilters = () => {
+            const yearSelect = document.getElementById('history-year-select');
+            const monthSelect = document.getElementById('history-month-select');
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1;
+
+            yearSelect.innerHTML = '';
+            for (let i = currentYear; i >= currentYear - 5; i--) {
+                yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
+            }
+            yearSelect.value = currentYear;
+
+            monthSelect.innerHTML = '';
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            for (let i = 0; i < 12; i++) {
+                monthSelect.innerHTML += `<option value="${i + 1}">${monthNames[i]}</option>`;
+            }
+            monthSelect.value = currentMonth;
         };
 
         const renderRoutines = () => {
@@ -333,22 +390,31 @@
         const renderWorkoutHistory = (workoutsByDate) => {
             historyList.innerHTML = '';
             if (Object.keys(workoutsByDate).length === 0) {
-                historyList.innerHTML = '<p>No workouts found in your history.</p>';
+                historyList.innerHTML = '<p>No workouts found for this period.</p>';
                 return;
             }
 
             for (const date in workoutsByDate) {
                 const dateEl = document.createElement('div');
-                dateEl.className = 'bg-white p-4 rounded-lg shadow';
+                dateEl.className = 'bg-white p-4 rounded-lg shadow-sm';
                 const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                
                 let exercisesHTML = workoutsByDate[date].map(log => `
-                    <div class="flex justify-between border-t pt-2 mt-2">
+                    <div class="flex justify-between border-t pt-2 mt-2 first:border-t-0 first:mt-0 first:pt-0">
                         <p class="font-semibold">${log.exercises.name}</p>
                         <p>${log.sets}x${log.reps} @ ${log.weight}kg</p>
                     </div>
                 `).join('');
 
-                dateEl.innerHTML = `<h3 class="font-bold text-lg mb-2">${formattedDate}</h3> ${exercisesHTML}`;
+                dateEl.innerHTML = `
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleWorkoutDetails(this)">
+                        <h3 class="font-bold text-lg">${formattedDate}</h3>
+                        <button class="text-blue-500 text-sm font-medium pointer-events-none">Expand</button>
+                    </div>
+                    <div class="mt-2 pt-2 border-t hidden">
+                        ${exercisesHTML}
+                    </div>
+                `;
                 historyList.appendChild(dateEl);
             }
         };
@@ -619,7 +685,7 @@
         loginBtn.addEventListener('click', logInWithFacebook);
         logoutBtn.addEventListener('click', logout);
         startWorkoutBtn.addEventListener('click', startNewWorkout);
-        showHistoryBtn.addEventListener('click', fetchWorkoutHistory);
+        showHistoryBtn.addEventListener('click', initializeHistoryView);
         showProgressBtn.addEventListener('click', showProgress);
         backToDashBtns.forEach(btn => btn.addEventListener('click', () => showView('dashboard')));
         progressExerciseSelect.addEventListener('change', (e) => fetchAndDrawProgressChart(e.target.value));
@@ -648,5 +714,3 @@
     </script>
 </body>
 </html>
-```
-I've implemented the changes we discussed. The app now uses integrated modals for all user interactions, which should fix the issue with the save button and make the experience smoother overall. Let me know how it works for y
