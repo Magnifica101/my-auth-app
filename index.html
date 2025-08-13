@@ -361,27 +361,37 @@
             sessionListEl.innerHTML = '';
             currentSessionLogs.forEach((log, index) => {
                 const exercise = masterExerciseList.find(ex => ex.id == log.exercise_id);
+                const isCompleted = !!log.completed_at;
                 const logEl = document.createElement('div');
-                logEl.className = 'bg-gray-200 p-3 rounded-md';
+                logEl.className = `p-3 rounded-md ${isCompleted ? 'bg-green-100' : 'bg-gray-200'}`;
+                
+                let completionHTML = '';
+                if (isCompleted) {
+                    completionHTML = `<div class="text-sm text-green-700 font-semibold mt-2">Completed: ${new Date(log.completed_at).toLocaleTimeString('en-NZ')}</div>`;
+                } else {
+                    completionHTML = `<button onclick="markExerciseAsComplete(${index})" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg text-sm">Complete</button>`;
+                }
+
                 logEl.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
+                    <div class="flex justify-between items-start mb-2">
                         <p class="font-bold">${exercise ? exercise.name : 'Unknown Exercise'}</p>
-                        <button onclick="removeExerciseFromSession(${index})" class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">&times;</button>
+                        <button onclick="removeExerciseFromSession(${index})" class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0">&times;</button>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="text-xs">Weight (kg)</label>
-                            <input type="number" step="0.5" value="${log.weight}" data-index="${index}" data-field="weight" class="w-full p-1 border rounded-md">
+                            <input type="number" step="0.5" value="${log.weight}" data-index="${index}" data-field="weight" class="w-full p-1 border rounded-md" ${isCompleted ? 'disabled' : ''}>
                         </div>
                         <div>
                             <label class="text-xs">Reps</label>
-                            <input type="number" value="${log.reps}" data-index="${index}" data-field="reps" class="w-full p-1 border rounded-md">
+                            <input type="number" value="${log.reps}" data-index="${index}" data-field="reps" class="w-full p-1 border rounded-md" ${isCompleted ? 'disabled' : ''}>
                         </div>
                         <div>
                             <label class="text-xs">Sets</label>
-                            <input type="number" value="${log.sets}" data-index="${index}" data-field="sets" class="w-full p-1 border rounded-md">
+                            <input type="number" value="${log.sets}" data-index="${index}" data-field="sets" class="w-full p-1 border rounded-md" ${isCompleted ? 'disabled' : ''}>
                         </div>
                     </div>
+                    ${completionHTML}
                 `;
                 sessionListEl.appendChild(logEl);
             });
@@ -399,12 +409,17 @@
                 dateEl.className = 'bg-white p-4 rounded-lg shadow-sm';
                 const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                 
-                let exercisesHTML = workoutsByDate[date].map(log => `
+                let exercisesHTML = workoutsByDate[date].map(log => {
+                    const completedTime = log.completed_at ? `at ${new Date(log.completed_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}` : '';
+                    return `
                     <div class="flex justify-between border-t pt-2 mt-2 first:border-t-0 first:mt-0 first:pt-0">
-                        <p class="font-semibold">${log.exercises.name}</p>
-                        <p>${log.sets}x${log.reps} @ ${log.weight}kg</p>
+                        <div>
+                           <p class="font-semibold">${log.exercises.name}</p>
+                           <p class="text-xs text-gray-500">${completedTime}</p>
+                        </div>
+                        <p class="text-right">${log.sets}x${log.reps} @ ${log.weight}kg</p>
                     </div>
-                `).join('');
+                `}).join('');
 
                 dateEl.innerHTML = `
                     <div class="flex justify-between items-center cursor-pointer" onclick="toggleWorkoutDetails(this)">
@@ -424,6 +439,18 @@
             currentSessionLogs = [];
             renderCurrentSession();
             showView('live-session');
+        };
+        
+        const markExerciseAsComplete = (index) => {
+            const log = currentSessionLogs[index];
+            if (!log) return;
+            // Update the log with the latest values from the input fields before marking as complete
+            log.weight = document.querySelector(`[data-index='${index}'][data-field='weight']`).value;
+            log.reps = document.querySelector(`[data-index='${index}'][data-field='reps']`).value;
+            log.sets = document.querySelector(`[data-index='${index}'][data-field='sets']`).value;
+            
+            log.completed_at = new Date().toISOString();
+            renderCurrentSession();
         };
 
         const loadRoutine = async (routineId) => {
@@ -465,6 +492,7 @@
                     weight: lastLog?.weight || 0,
                     reps: lastLog?.reps || 0,
                     sets: lastLog?.sets || 0,
+                    completed_at: null // Ensure it's null for a new session
                 };
             });
 
@@ -486,6 +514,7 @@
                 weight: document.getElementById('weight').value,
                 reps: document.getElementById('reps').value,
                 sets: document.getElementById('sets').value,
+                completed_at: null
             });
             renderCurrentSession();
             addExerciseForm.reset();
@@ -502,18 +531,25 @@
         
         const updateSessionLogsFromUI = () => {
             currentSessionLogs.forEach((log, index) => {
-                log.weight = document.querySelector(`[data-index='${index}'][data-field='weight']`).value;
-                log.reps = document.querySelector(`[data-index='${index}'][data-field='reps']`).value;
-                log.sets = document.querySelector(`[data-index='${index}'][data-field='sets']`).value;
+                // Only update if not already completed
+                if (!log.completed_at) {
+                    log.weight = document.querySelector(`[data-index='${index}'][data-field='weight']`).value;
+                    log.reps = document.querySelector(`[data-index='${index}'][data-field='reps']`).value;
+                    log.sets = document.querySelector(`[data-index='${index}'][data-field='sets']`).value;
+                }
             });
         };
 
         const saveWorkoutLogs = async () => {
             const user = (await _supabase.auth.getUser()).data.user;
             const logsToInsert = currentSessionLogs.map(log => ({ 
-                ...log, 
                 user_id: user.id, 
-                log_date: new Date().toISOString().split('T')[0] 
+                log_date: new Date().toISOString().split('T')[0],
+                exercise_id: log.exercise_id,
+                weight: log.weight,
+                reps: log.reps,
+                sets: log.sets,
+                completed_at: log.completed_at
             }));
             const { error } = await _supabase.from('exercise_logs').insert(logsToInsert);
             if (error) {
