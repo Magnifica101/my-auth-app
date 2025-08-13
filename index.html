@@ -117,7 +117,7 @@
         
         <!-- Save Routine Modal -->
         <div id="save-routine-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-             <div id="modal-content" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm transform scale-95">
+             <div id="modal-content" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
                 <h2 class="text-xl font-bold mb-4">Save Workout as Routine</h2>
                 <p class="mb-4 text-sm text-gray-600">Save the exercises from this session as a new reusable template.</p>
                 <form id="save-routine-form">
@@ -125,11 +125,30 @@
                         <label for="routine-name" class="block text-sm font-medium text-gray-700">Routine Name</label>
                         <input type="text" id="routine-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
                     </div>
+                    <div id="save-routine-message" class="text-sm mt-4"></div>
                     <div class="mt-6 flex justify-end gap-4">
                         <button type="button" id="skip-save-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Don't Save Template</button>
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Save Routine</button>
+                        <button type="submit" id="save-routine-submit-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center">
+                           <span id="save-routine-btn-text">Save Routine</span>
+                           <svg id="save-routine-spinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                           </svg>
+                        </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+             <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+                <h2 id="confirmation-title" class="text-xl font-bold mb-4">Are you sure?</h2>
+                <p id="confirmation-message" class="mb-6 text-gray-600">This action cannot be undone.</p>
+                <div class="flex justify-end gap-4">
+                    <button id="confirmation-cancel-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancel</button>
+                    <button id="confirmation-confirm-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>
+                </div>
             </div>
         </div>
     </div>
@@ -172,7 +191,7 @@
 
         // --- UI VIEW MANAGEMENT ---
         const showView = (view) => {
-            [authView, appView, dashboardView, liveSessionView, historyView, progressView, saveRoutineModal].forEach(el => el.classList.add('hidden'));
+            [authView, appView, dashboardView, liveSessionView, historyView, progressView, saveRoutineModal, document.getElementById('confirmation-modal')].forEach(el => el.classList.add('hidden'));
             if (view === 'login') authView.classList.remove('hidden');
             else {
                 appView.classList.remove('hidden');
@@ -181,6 +200,31 @@
                 if (view === 'history') historyView.classList.remove('hidden');
                 if (view === 'progress') progressView.classList.remove('hidden');
             }
+        };
+        
+        // --- UTILITY FUNCTIONS ---
+        const showConfirmation = (title, message, onConfirm) => {
+            const modal = document.getElementById('confirmation-modal');
+            document.getElementById('confirmation-title').textContent = title;
+            document.getElementById('confirmation-message').textContent = message;
+            
+            const confirmBtn = document.getElementById('confirmation-confirm-btn');
+            const cancelBtn = document.getElementById('confirmation-cancel-btn');
+
+            const confirmHandler = () => {
+                onConfirm();
+                modal.classList.add('hidden');
+            };
+
+            const cancelHandler = () => {
+                modal.classList.add('hidden');
+            };
+            
+            // Use { once: true } to automatically remove the event listener after it fires once.
+            confirmBtn.addEventListener('click', confirmHandler, { once: true });
+            cancelBtn.addEventListener('click', cancelHandler, { once: true });
+
+            modal.classList.remove('hidden');
         };
 
         // --- DATA FETCHING ---
@@ -245,7 +289,7 @@
                     <button class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg text-left">${routine.name}</button>
                     <button onclick="handleDeleteRoutine(${routine.id}, '${routine.name}')" class="bg-red-500 hover:bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 text-lg font-bold">&times;</button>
                 `;
-                routineEl.querySelector('button').onclick = () => loadRoutine(routine.id);
+                routineEl.querySelector('button:first-child').onclick = () => loadRoutine(routine.id);
                 routinesList.appendChild(routineEl);
             });
         };
@@ -329,8 +373,6 @@
                 return;
             }
 
-            // --- FIX START ---
-            // Replaced the potentially faulty RPC call with a standard query and JS logic for better reliability.
             const { data, error } = await _supabase
                 .from('exercise_logs')
                 .select('exercise_id, weight, reps, sets, log_date')
@@ -339,13 +381,9 @@
 
             if (error) {
                 console.error('Error fetching last logs:', error);
-                alert('Could not load routine data. Please check the browser console for errors.');
                 return;
             }
 
-            // Process the data to find the most recent log for each exercise.
-            // The query gets all logs for the exercises, ordered by date descending.
-            // This map ensures we only take the very first one we encounter for each exercise_id.
             const lastLogsMap = new Map();
             for (const log of data) {
                 if (!lastLogsMap.has(log.exercise_id)) {
@@ -353,7 +391,6 @@
                 }
             }
             const lastLogs = Array.from(lastLogsMap.values());
-            // --- FIX END ---
 
             currentSessionLogs = exerciseIds.map(exId => {
                 const lastLog = lastLogs.find(log => log.exercise_id == exId);
@@ -376,8 +413,10 @@
 
         const handleAddExercise = (event) => {
             event.preventDefault();
+            const exerciseId = document.getElementById('exercise-select').value;
+            if (!exerciseId) return;
             currentSessionLogs.push({
-                exercise_id: document.getElementById('exercise-select').value,
+                exercise_id: exerciseId,
                 weight: document.getElementById('weight').value,
                 reps: document.getElementById('reps').value,
                 sets: document.getElementById('sets').value,
@@ -388,7 +427,7 @@
 
         const finishWorkout = async () => {
             if (currentSessionLogs.length === 0) {
-                alert('Cannot save an empty workout.');
+                showConfirmation("Empty Workout", "Cannot save an empty workout. Do you want to discard it?", () => showView('dashboard'));
                 return;
             }
             updateSessionLogsFromUI();
@@ -421,71 +460,115 @@
             event.preventDefault();
             const routineNameInput = document.getElementById('routine-name');
             const routineName = routineNameInput.value.trim();
+            
+            const messageEl = document.getElementById('save-routine-message');
+            const submitBtn = document.getElementById('save-routine-submit-btn');
+            const skipBtn = document.getElementById('skip-save-btn');
+            const btnText = document.getElementById('save-routine-btn-text');
+            const spinner = document.getElementById('save-routine-spinner');
+
+            messageEl.textContent = '';
             if (!routineName) {
-                alert('Please enter a routine name.');
+                messageEl.textContent = 'Please enter a routine name.';
+                messageEl.className = 'text-sm mt-4 text-red-600';
                 return;
             }
+
+            submitBtn.disabled = true;
+            skipBtn.disabled = true;
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+
             const user = (await _supabase.auth.getUser()).data.user;
 
             try {
-                // 1. Save the routine
                 const { data: newRoutine, error: routineError } = await _supabase
-                    .from('routines')
-                    .insert({ name: routineName, user_id: user.id })
-                    .select()
-                    .single();
+                    .from('routines').insert({ name: routineName, user_id: user.id }).select().single();
                 if (routineError) throw routineError;
 
-                // 2. Save the routine items
                 const uniqueExerciseIds = [...new Set(currentSessionLogs.map(log => log.exercise_id))];
-                const itemsToInsert = uniqueExerciseIds.map(exId => ({
-                    routine_id: newRoutine.id,
-                    exercise_id: exId
-                }));
+                const itemsToInsert = uniqueExerciseIds.map(exId => ({ routine_id: newRoutine.id, exercise_id: exId }));
                 if (itemsToInsert.length > 0) {
                     const { error: itemsError } = await _supabase.from('routine_items').insert(itemsToInsert);
                     if (itemsError) throw itemsError;
                 }
                 
-                // 3. Save the actual workout logs
                 await saveWorkoutLogs();
 
-                // 4. Success!
-                alert('Routine and workout saved successfully!');
-                routineNameInput.value = ''; // Clear input
+                messageEl.textContent = 'Routine and workout saved successfully!';
+                messageEl.className = 'text-sm mt-4 text-green-600';
                 await fetchUserRoutines();
-                saveRoutineModal.classList.add('hidden');
-                showView('dashboard');
+                
+                setTimeout(() => {
+                    saveRoutineModal.classList.add('hidden');
+                    showView('dashboard');
+                    routineNameInput.value = '';
+                    submitBtn.disabled = false;
+                    skipBtn.disabled = false;
+                    btnText.classList.remove('hidden');
+                    spinner.classList.add('hidden');
+                    messageEl.textContent = '';
+                }, 1500);
 
             } catch (error) {
                 console.error('Failed to save routine:', error);
-                alert(`Error saving routine: ${error.message}`);
+                messageEl.textContent = `Error: ${error.message}`;
+                messageEl.className = 'text-sm mt-4 text-red-600';
+                submitBtn.disabled = false;
+                skipBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
             }
         };
 
         const handleSkipSave = async () => {
+            const messageEl = document.getElementById('save-routine-message');
+            const submitBtn = document.getElementById('save-routine-submit-btn');
+            const skipBtn = document.getElementById('skip-save-btn');
+            const routineNameInput = document.getElementById('routine-name');
+
+            submitBtn.disabled = true;
+            skipBtn.disabled = true;
+            messageEl.textContent = 'Saving workout...';
+            messageEl.className = 'text-sm mt-4 text-gray-600';
+
             try {
                 await saveWorkoutLogs();
-                alert('Workout saved successfully!');
-                saveRoutineModal.classList.add('hidden');
-                document.getElementById('routine-name').value = ''; // Clear input
-                showView('dashboard');
+                messageEl.textContent = 'Workout saved successfully!';
+                messageEl.className = 'text-sm mt-4 text-green-600';
+
+                setTimeout(() => {
+                    saveRoutineModal.classList.add('hidden');
+                    showView('dashboard');
+                    routineNameInput.value = '';
+                    submitBtn.disabled = false;
+                    skipBtn.disabled = false;
+                    messageEl.textContent = '';
+                }, 1500);
+
             } catch (error) {
-                alert(error.message);
+                console.error('Failed to save workout:', error);
+                messageEl.textContent = `Error: ${error.message}`;
+                messageEl.className = 'text-sm mt-4 text-red-600';
+                submitBtn.disabled = false;
+                skipBtn.disabled = false;
             }
         };
 
         const handleDeleteRoutine = async (routineId, routineName) => {
-            if (!confirm(`Are you sure you want to delete the routine "${routineName}"?`)) return;
-
-            const { error } = await _supabase.from('routines').delete().match({ id: routineId });
-            if (error) {
-                alert('Error deleting routine.');
-                console.error(error);
-            } else {
-                alert('Routine deleted.');
-                fetchUserRoutines(); // Refresh the list
-            }
+            showConfirmation(
+                'Delete Routine?',
+                `Are you sure you want to delete the routine "${routineName}"? This cannot be undone.`,
+                async () => {
+                    const { error } = await _supabase.from('routines').delete().match({ id: routineId });
+                    if (error) {
+                        console.error('Error deleting routine:', error);
+                    } else {
+                        console.log('Routine deleted.');
+                        fetchUserRoutines();
+                    }
+                }
+            );
         };
 
         // --- PROGRESS CHART LOGIC ---
@@ -542,9 +625,11 @@
         progressExerciseSelect.addEventListener('change', (e) => fetchAndDrawProgressChart(e.target.value));
         finishWorkoutBtn.addEventListener('click', finishWorkout);
         cancelWorkoutBtn.addEventListener('click', () => {
-            if(confirm('Are you sure you want to cancel this workout? All progress will be lost.')) {
-                showView('dashboard');
-            }
+            showConfirmation(
+                'Cancel Workout?',
+                'Are you sure you want to cancel this workout? All unsaved progress will be lost.',
+                () => showView('dashboard')
+            );
         });
         addExerciseForm.addEventListener('submit', handleAddExercise);
         saveRoutineForm.addEventListener('submit', handleSaveRoutine);
@@ -564,5 +649,4 @@
 </body>
 </html>
 ```
-
-I've updated the `loadRoutine` function to be more robust. This should now let you open your saved workouts without any errors. Let me know if you have any other questio
+I've implemented the changes we discussed. The app now uses integrated modals for all user interactions, which should fix the issue with the save button and make the experience smoother overall. Let me know how it works for y
