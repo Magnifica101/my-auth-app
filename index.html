@@ -316,21 +316,37 @@
             showView('live-session');
         };
 
+        /**
+         * [FIXED] Loads a routine and pre-populates it with the most recent performance data.
+         * This function now calls a custom PostgreSQL function `get_last_logs_for_exercises`
+         * via RPC (Remote Procedure Call) to ensure the correct data is fetched efficiently.
+         */
         const loadRoutine = async (routineId) => {
             const routine = userRoutines.find(r => r.id === routineId);
             if (!routine) return;
 
             const exerciseIds = routine.routine_items.map(item => item.exercise_id);
+            
+            if (exerciseIds.length === 0) {
+                currentSessionLogs = [];
+                renderCurrentSession();
+                showView('live-session');
+                return;
+            }
+
+            // Call the new database function via RPC
             const { data: lastLogs, error } = await _supabase
-                .from('exercise_logs')
-                .select('exercise_id, weight, reps, sets')
-                .in('exercise_id', exerciseIds)
-                .order('log_date', { ascending: false });
+                .rpc('get_last_logs_for_exercises', { exercise_ids: exerciseIds });
 
-            if (error) console.error('Error fetching last logs:', error);
+            if (error) {
+                console.error('Error fetching last logs via RPC:', error);
+                alert('Could not load routine data. Please check the browser console for errors.');
+                return;
+            }
 
+            // Map the results. The RPC returns exactly what we need.
             currentSessionLogs = exerciseIds.map(exId => {
-                const lastLog = lastLogs?.find(log => log.exercise_id === exId);
+                const lastLog = lastLogs.find(log => log.exercise_id == exId);
                 return {
                     exercise_id: exId,
                     weight: lastLog?.weight || 0,
@@ -338,6 +354,7 @@
                     sets: lastLog?.sets || 0,
                 };
             });
+
             renderCurrentSession();
             showView('live-session');
         };
@@ -387,6 +404,7 @@
             } else {
                 alert('Workout saved successfully!');
             }
+            saveRoutineModal.classList.add('hidden');
             showView('dashboard');
         };
 
@@ -483,16 +501,23 @@
         backToDashBtns.forEach(btn => btn.addEventListener('click', () => showView('dashboard')));
         progressExerciseSelect.addEventListener('change', (e) => fetchAndDrawProgressChart(e.target.value));
         finishWorkoutBtn.addEventListener('click', finishWorkout);
-        cancelWorkoutBtn.addEventListener('click', () => showView('dashboard'));
+        cancelWorkoutBtn.addEventListener('click', () => {
+            if(confirm('Are you sure you want to cancel this workout? All progress will be lost.')) {
+                showView('dashboard');
+            }
+        });
         addExerciseForm.addEventListener('submit', handleAddExercise);
         saveRoutineForm.addEventListener('submit', handleSaveRoutine);
-        skipSaveBtn.addEventListener('click', saveLogsAndExit);
+        skipSaveBtn.addEventListener('click', () => {
+             saveRoutineModal.classList.add('hidden');
+             saveLogsAndExit();
+        });
 
         // --- MAIN AUTH STATE LISTENER ---
-        _supabase.auth.onAuthStateChange((event, session) => {
+        _supabase.auth.onAuthStateChange(async (event, session) => {
             if (session && session.user) {
                 userInfoDiv.textContent = `Hello, ${session.user.user_metadata?.full_name || session.user.email}`;
-                fetchInitialData();
+                await fetchInitialData();
                 showView('dashboard');
             } else {
                 showView('login');
