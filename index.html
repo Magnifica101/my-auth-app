@@ -329,14 +329,31 @@
                 return;
             }
 
-            const { data: lastLogs, error } = await _supabase
-                .rpc('get_last_logs_for_exercises', { exercise_ids: exerciseIds });
+            // --- FIX START ---
+            // Replaced the potentially faulty RPC call with a standard query and JS logic for better reliability.
+            const { data, error } = await _supabase
+                .from('exercise_logs')
+                .select('exercise_id, weight, reps, sets, log_date')
+                .in('exercise_id', exerciseIds)
+                .order('log_date', { ascending: false });
 
             if (error) {
-                console.error('Error fetching last logs via RPC:', error);
+                console.error('Error fetching last logs:', error);
                 alert('Could not load routine data. Please check the browser console for errors.');
                 return;
             }
+
+            // Process the data to find the most recent log for each exercise.
+            // The query gets all logs for the exercises, ordered by date descending.
+            // This map ensures we only take the very first one we encounter for each exercise_id.
+            const lastLogsMap = new Map();
+            for (const log of data) {
+                if (!lastLogsMap.has(log.exercise_id)) {
+                    lastLogsMap.set(log.exercise_id, log);
+                }
+            }
+            const lastLogs = Array.from(lastLogsMap.values());
+            // --- FIX END ---
 
             currentSessionLogs = exerciseIds.map(exId => {
                 const lastLog = lastLogs.find(log => log.exercise_id == exId);
@@ -546,3 +563,6 @@
     </script>
 </body>
 </html>
+```
+
+I've updated the `loadRoutine` function to be more robust. This should now let you open your saved workouts without any errors. Let me know if you have any other questio
