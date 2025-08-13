@@ -316,11 +316,6 @@
             showView('live-session');
         };
 
-        /**
-         * [FIXED] Loads a routine and pre-populates it with the most recent performance data.
-         * This function now calls a custom PostgreSQL function `get_last_logs_for_exercises`
-         * via RPC (Remote Procedure Call) to ensure the correct data is fetched efficiently.
-         */
         const loadRoutine = async (routineId) => {
             const routine = userRoutines.find(r => r.id === routineId);
             if (!routine) return;
@@ -334,7 +329,6 @@
                 return;
             }
 
-            // Call the new database function via RPC
             const { data: lastLogs, error } = await _supabase
                 .rpc('get_last_logs_for_exercises', { exercise_ids: exerciseIds });
 
@@ -344,7 +338,6 @@
                 return;
             }
 
-            // Map the results. The RPC returns exactly what we need.
             currentSessionLogs = exerciseIds.map(exId => {
                 const lastLog = lastLogs.find(log => log.exercise_id == exId);
                 return {
@@ -378,8 +371,8 @@
 
         const finishWorkout = async () => {
             if (currentSessionLogs.length === 0) {
-                alert('No exercises logged.');
-                return showView('dashboard');
+                alert('Cannot save an empty workout.');
+                return;
             }
             updateSessionLogsFromUI();
             saveRoutineModal.classList.remove('hidden');
@@ -393,46 +386,76 @@
             });
         };
 
-        const saveLogsAndExit = async () => {
+        const saveWorkoutLogs = async () => {
             const user = (await _supabase.auth.getUser()).data.user;
-            const logsToInsert = currentSessionLogs.map(log => ({ ...log, user_id: user.id }));
+            const logsToInsert = currentSessionLogs.map(log => ({ 
+                ...log, 
+                user_id: user.id, 
+                log_date: new Date().toISOString().split('T')[0] 
+            }));
             const { error } = await _supabase.from('exercise_logs').insert(logsToInsert);
-
             if (error) {
-                console.error('Error saving workout:', error);
-                alert('Failed to save workout logs.');
-            } else {
-                alert('Workout saved successfully!');
+                console.error('Error saving workout logs:', error);
+                throw new Error('Failed to save workout logs.');
             }
-            saveRoutineModal.classList.add('hidden');
-            showView('dashboard');
         };
 
         const handleSaveRoutine = async (event) => {
             event.preventDefault();
-            const routineName = document.getElementById('routine-name').value;
+            const routineNameInput = document.getElementById('routine-name');
+            const routineName = routineNameInput.value.trim();
+            if (!routineName) {
+                alert('Please enter a routine name.');
+                return;
+            }
             const user = (await _supabase.auth.getUser()).data.user;
 
-            const { data: newRoutine, error: routineError } = await _supabase
-                .from('routines')
-                .insert({ name: routineName, user_id: user.id })
-                .select()
-                .single();
+            try {
+                // 1. Save the routine
+                const { data: newRoutine, error: routineError } = await _supabase
+                    .from('routines')
+                    .insert({ name: routineName, user_id: user.id })
+                    .select()
+                    .single();
+                if (routineError) throw routineError;
 
-            if (routineError) return console.error('Error saving routine:', routineError);
+                // 2. Save the routine items
+                const uniqueExerciseIds = [...new Set(currentSessionLogs.map(log => log.exercise_id))];
+                const itemsToInsert = uniqueExerciseIds.map(exId => ({
+                    routine_id: newRoutine.id,
+                    exercise_id: exId
+                }));
+                if (itemsToInsert.length > 0) {
+                    const { error: itemsError } = await _supabase.from('routine_items').insert(itemsToInsert);
+                    if (itemsError) throw itemsError;
+                }
+                
+                // 3. Save the actual workout logs
+                await saveWorkoutLogs();
 
-            const uniqueExerciseIds = [...new Set(currentSessionLogs.map(log => log.exercise_id))];
-            const itemsToInsert = uniqueExerciseIds.map(exId => ({
-                routine_id: newRoutine.id,
-                exercise_id: exId
-            }));
+                // 4. Success!
+                alert('Routine and workout saved successfully!');
+                routineNameInput.value = ''; // Clear input
+                await fetchUserRoutines();
+                saveRoutineModal.classList.add('hidden');
+                showView('dashboard');
 
-            const { error: itemsError } = await _supabase.from('routine_items').insert(itemsToInsert);
-            
-            if (itemsError) console.error('Error saving routine items:', itemsError);
-            
-            await fetchUserRoutines();
-            await saveLogsAndExit();
+            } catch (error) {
+                console.error('Failed to save routine:', error);
+                alert(`Error saving routine: ${error.message}`);
+            }
+        };
+
+        const handleSkipSave = async () => {
+            try {
+                await saveWorkoutLogs();
+                alert('Workout saved successfully!');
+                saveRoutineModal.classList.add('hidden');
+                document.getElementById('routine-name').value = ''; // Clear input
+                showView('dashboard');
+            } catch (error) {
+                alert(error.message);
+            }
         };
 
         const handleDeleteRoutine = async (routineId, routineName) => {
@@ -508,10 +531,7 @@
         });
         addExerciseForm.addEventListener('submit', handleAddExercise);
         saveRoutineForm.addEventListener('submit', handleSaveRoutine);
-        skipSaveBtn.addEventListener('click', () => {
-             saveRoutineModal.classList.add('hidden');
-             saveLogsAndExit();
-        });
+        skipSaveBtn.addEventListener('click', handleSkipSave);
 
         // --- MAIN AUTH STATE LISTENER ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
